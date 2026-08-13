@@ -59,6 +59,16 @@ async def serve_dashboard():
     return FileResponse("app/static/index.html")
 
 
+@app.get("/dispatcher", include_in_schema=False)
+async def serve_dispatcher():
+    return FileResponse("app/static/dispatcher.html")
+
+
+@app.get("/citizen", include_in_schema=False)
+async def serve_citizen():
+    return FileResponse("app/static/citizen.html")
+
+
 @app.get("/health", tags=["Health"])
 def health_check():
 

@@ -68,7 +68,7 @@ gotham-dispatch/
 │       └── dispatch_service.py # Unit creation & transactional assignment logic
 ├── tests/
 │   ├── __init__.py
-│   └── test_api.py          # Pytest suite (18 automated tests)
+│   └── test_api.py          # Pytest suite (20 automated tests)
 ├── requirements.txt
 ├── Makefile
 ├── README.md
@@ -321,7 +321,7 @@ pytest tests/ -v
 
 Output:
 ```text
-======================== 18 passed in 1.16s ========================
+======================== 20 passed in 0.95s ========================
 ```
 
 ---

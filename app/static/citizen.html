@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gotham City Emergency Portal // Citizen Hotline</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <!-- Leaflet Map CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root {
+      --bg-dark: #07090e;
+      --panel-bg: rgba(15, 23, 42, 0.85);
+      --panel-border: rgba(255, 255, 255, 0.1);
+      --primary-amber: #f39c12;
+      --accent-red: #e74c3c;
+      --accent-green: #2ecc71;
+      --accent-blue: #3498db;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --card-bg: #0f172a;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background-image: 
+        radial-gradient(circle at 10% 10%, rgba(243, 156, 18, 0.08), transparent 35%),
+        radial-gradient(circle at 90% 90%, rgba(231, 76, 60, 0.08), transparent 35%);
+    }
+
+    header {
+      background: rgba(10, 10, 10, 0.95);
+      border-bottom: 1px solid var(--panel-border);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-logo {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, var(--primary-amber), var(--accent-red));
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1.25rem;
+      color: #000;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .brand-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .header-links {
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn-nav {
+      color: var(--primary-amber);
+      text-decoration: none;
+      border: 1px solid var(--primary-amber);
+      padding: 6px 14px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    .btn-nav:hover {
+      background: var(--primary-amber);
+      color: #000;
+    }
+
+    main {
+      padding: 2rem;
+      max-width: 1300px;
+      margin: 0 auto;
+      width: 100%;
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 2rem;
+      flex: 1;
+    }
+
+    @media (max-width: 992px) {
+      main { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: var(--panel-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+    }
+
+    .panel-header {
+      border-bottom: 1px solid var(--panel-border);
+      padding-bottom: 0.75rem;
+    }
+
+    .panel-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--primary-amber);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    input, select, textarea {
+      background: #000;
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      padding: 0.75rem 0.9rem;
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary-amber);
+      box-shadow: 0 0 0 2px rgba(243, 156, 18, 0.2);
+    }
+
+    .btn-submit {
+      background: linear-gradient(135deg, var(--primary-amber), #d35400);
+      color: #000;
+      border: none;
+      border-radius: 6px;
+      padding: 0.85rem;
+      font-weight: 800;
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    .btn-submit:hover {
+      opacity: 0.95;
+      transform: translateY(-1px);
+    }
+
+    #citizen-map {
+      width: 100%;
+      height: 320px;
+      border-radius: 8px;
+      border: 1px solid var(--panel-border);
+    }
+
+    .alert-banner {
+      display: none;
+      padding: 1rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+
+    .alert-success {
+      display: block;
+      background: rgba(46, 204, 113, 0.15);
+      border: 1px solid var(--accent-green);
+      color: var(--accent-green);
+    }
+
+    .reports-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .report-card {
+      background: var(--card-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 3px;
+      text-transform: uppercase;
+    }
+
+    .badge-FIRE { color: var(--accent-red); border: 1px solid var(--accent-red); }
+    .badge-POLICE { color: var(--accent-blue); border: 1px solid var(--accent-blue); }
+    .badge-MEDICAL { color: var(--accent-green); border: 1px solid var(--accent-green); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-logo">G</div>
+      <div class="brand-title">Gotham Emergency Hotline // Citizen Response</div>
+    </div>
+    <div class="header-links">
+      <a href="/dispatcher" class="btn-nav">GCPD TERMINAL &rarr;</a>
+      <a href="/" class="btn-nav">MAIN HUB</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- Submit Emergency Panel -->
+    <section class="panel">
+      <div class="panel-header">
+        <h2 class="panel-title">➕ Submit Emergency Report</h2>
+      </div>
+
+      <div id="alertBox" class="alert-banner"></div>
+
+      <form id="citizenReportForm">
+        <div class="form-group">
+          <label>Emergency Type</label>
+          <select id="typeSelect" required>
+            <option value="MEDICAL">MEDICAL EMERGENCY</option>
+            <option value="FIRE">FIRE / RESCUE</option>
+            <option value="POLICE">POLICE / LAW ENFORCEMENT</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Priority Severity</label>
+          <select id="prioritySelect" required>
+            <option value="HIGH">HIGH (Urgent Response Needed)</option>
+            <option value="CRITICAL">CRITICAL (Life Threatening)</option>
+            <option value="MEDIUM">MEDIUM</option>
+            <option value="LOW">LOW</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Description of Incident</label>
+          <textarea id="descText" rows="3" placeholder="Describe the situation clearly..." required>Vehicle collision with smoke observed.</textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Location Address / Landmark</label>
+          <input type="text" id="addrInput" value="Gotham Heights Boulevard" placeholder="e.g. 5th & Main, Gotham Plaza">
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+          <div class="form-group">
+            <label>Latitude</label>
+            <input type="number" step="any" id="latInput" value="40.7128" required>
+          </div>
+          <div class="form-group">
+            <label>Longitude</label>
+            <input type="number" step="any" id="lngInput" value="-74.0060" required>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-submit">📡 BROADCAST EMERGENCY REPORT</button>
+      </form>
+    </section>
+
+    <!-- Map & Recent Reports Feed -->
+    <section class="panel">
+      <div class="panel-header">
+        <h2 class="panel-title">🎯 Interactive Location Map (Click map to auto-set coordinates)</h2>
+      </div>
+
+      <div id="citizen-map"></div>
+
+      <div class="panel-header" style="margin-top: 1rem;">
+        <h2 class="panel-title">📋 Live Active Incidents Feed</h2>
+      </div>
+
+      <div class="reports-list" id="citizenReportsList">
+        <!-- Rendered via JS -->
+      </div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const API_BASE = '/api/v1';
+    let map = null;
+    let markers = [];
+
+    function initMap() {
+      map = L.map('citizen-map').setView([40.7128, -74.0060], 13);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; CARTO',
+        maxZoom: 18
+      }).addTo(map);
+
+      map.on('click', (e) => {
+        document.getElementById('latInput').value = e.latlng.lat.toFixed(4);
+        document.getElementById('lngInput').value = e.latlng.lng.toFixed(4);
+      });
+
+      loadMapData();
+    }
+
+    async function loadMapData() {
+      if (!map) return;
+      markers.forEach(m => map.removeLayer(m));
+      markers = [];
+
+      try {
+        const res = await fetch(`${API_BASE}/dispatch/map/geojson`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        data.features.forEach(f => {
+          const [lon, lat] = f.geometry.coordinates;
+          const props = f.properties;
+          let color = '#f39c12';
+          if (props.type === 'FIRE') color = '#e74c3c';
+          if (props.type === 'POLICE') color = '#3498db';
+          if (props.type === 'MEDICAL') color = '#2ecc71';
+
+          const marker = L.circleMarker([lat, lon], {
+            radius: 8,
+            fillColor: color,
+            color: '#fff',
+            weight: 1,
+            fillOpacity: 0.8
+          }).addTo(map);
+          markers.push(marker);
+        });
+      } catch (err) {
+        console.error("Map error", err);
+      }
+    }
+
+    async function loadReports() {
+      try {
+        const res = await fetch(`${API_BASE}/dispatch/reports`);
+        if (!res.ok) return;
+        const reports = await res.json();
+        renderReports(reports);
+      } catch (err) {
+        console.error("Error loading reports", err);
+      }
+    }
+
+    function renderReports(reports) {
+      const container = document.getElementById('citizenReportsList');
+      container.innerHTML = '';
+
+      if (reports.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-muted); font-size:0.85rem;">No active reports recorded.</div>';
+        return;
+      }
+
+      reports.forEach(rep => {
+        const card = document.createElement('div');
+        card.className = 'report-card';
+        card.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span class="badge badge-${rep.type}">${rep.type}</span>
+            <span style="font-size:0.75rem; color:var(--primary-amber); font-weight:bold;">${rep.status}</span>
+          </div>
+          <div style="font-size:0.9rem; font-weight:500;">${rep.description}</div>
+          <div style="font-size:0.75rem; color:var(--text-muted);">
+            Location: (${rep.latitude.toFixed(4)}, ${rep.longitude.toFixed(4)}) ${rep.address ? '— ' + rep.address : ''}
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    document.getElementById('citizenReportForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const payload = {
+        type: document.getElementById('typeSelect').value,
+        priority: document.getElementById('prioritySelect').value,
+        description: document.getElementById('descText').value,
+        address: document.getElementById('addrInput').value,
+        latitude: parseFloat(document.getElementById('latInput').value),
+        longitude: parseFloat(document.getElementById('lngInput').value)
+      };
+
+      try {
+        const res = await fetch(`${API_BASE}/reports`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          alert(`Submission error: ${JSON.stringify(err.detail)}`);
+          return;
+        }
+
+        const data = await res.json();
+        const alertBox = document.getElementById('alertBox');
+        alertBox.className = 'alert-banner alert-success';
+        alertBox.innerHTML = `<strong>✓ Emergency Report Broadcasted Successfully!</strong><br/>Incident ID: ${data.id} | Status: REPORTED`;
+        
+        loadReports();
+        loadMapData();
+      } catch (err) {
+        alert(`Failed to submit report: ${err.message}`);
+      }
+    });
+
+    initMap();
+    loadReports();
+    setInterval(loadReports, 5000);
+  </script>
+</body>
+</html>
