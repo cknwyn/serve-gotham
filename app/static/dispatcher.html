@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GCPD // Command Terminal</title>
+    <style>
+        :root {
+            --bg-dark: #050505;
+            --panel: #0a0a0a;
+            --text-muted: #555;
+            --text-bright: #e0e0e0;
+            --accent-amber: #f39c12;
+            --accent-red: #e74c3c;
+            --accent-green: #2ecc71;
+            --border: #222;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-bright);
+            font-family: 'Consolas', 'Courier New', monospace;
+            margin: 0;
+            padding: 30px;
+            font-size: 14px;
+        }
+
+        .terminal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            border-bottom: 1px solid var(--text-muted);
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+
+        .terminal-header h1 { margin: 0; font-size: 1.4rem; color: var(--accent-amber); font-weight: normal; letter-spacing: 1px; }
+        .sys-clock { color: var(--text-muted); font-size: 0.9rem; }
+
+        .nav-link {
+            color: var(--accent-amber);
+            text-decoration: none;
+            font-size: 0.85rem;
+            margin-right: 15px;
+            border: 1px solid #333;
+            padding: 4px 10px;
+            border-radius: 4px;
+        }
+        .nav-link:hover {
+            background: #222;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--panel);
+            border: 1px solid var(--border);
+        }
+
+        th, td {
+            padding: 14px 20px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-weight: normal;
+            letter-spacing: 1px;
+            font-size: 0.8rem;
+        }
+
+        .row-alert { background: rgba(231, 76, 60, 0.03); }
+        
+        .badge {
+            padding: 4px 8px;
+            border-radius: 2px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .type-police { color: #3498db; border: 1px solid #3498db; }
+        .type-fire { color: var(--accent-red); border: 1px solid var(--accent-red); }
+        .type-medical { color: var(--accent-green); border: 1px solid var(--accent-green); }
+
+        .btn-dispatch {
+            background: transparent;
+            color: var(--accent-amber);
+            border: 1px solid var(--accent-amber);
+            padding: 6px 12px;
+            font-family: inherit;
+            font-size: 0.8rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: all 0.2s;
+        }
+
+        .btn-dispatch:hover { background: var(--accent-amber); color: #000; }
+        .btn-dispatch:disabled { border-color: var(--text-muted); color: var(--text-muted); cursor: not-allowed; background: transparent; }
+
+        .coord-text { color: #888; letter-spacing: 0.5px; }
+    </style>
+</head>
+<body>
+
+    <div class="terminal-header">
+        <div>
+            <h1>[SYS] GOTHAM DISPATCH // ACTIVE FEED</h1>
+            <div style="margin-top: 8px;">
+                <a href="/" class="nav-link">&laquo; Citizen Beacon</a>
+                <a href="/docs" target="_blank" class="nav-link">API Docs</a>
+            </div>
+        </div>
+        <div id="clock" class="sys-clock">00:00:00 UTC</div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Incident ID</th>
+                <th>T-Minus</th>
+                <th>Classification</th>
+                <th>Origin (LAT, LNG)</th>
+                <th>Status</th>
+                <th>Command</th>
+            </tr>
+        </thead>
+        <tbody id="feed-body">
+            <!-- Populated via Backend -->
+        </tbody>
+    </table>
+
+    <script>
+        // UI Logic: Terminal Clock
+        setInterval(() => document.getElementById('clock').innerText = new Date().toUTCString(), 1000);
+
+        // TRELLO TASK: Dashboard Hydration | MIX
+        // EXPECTATION: Backend exposes a GET route returning an array of incident JSON objects.
+        async function hydrateDashboard() {
+            try {
+                const response = await fetch('/api/dispatch');
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const incidents = await response.json();
+                renderGrid(incidents);
+            } catch (error) {
+                console.error("[SYS_ERR] Connection to mainframe severed.", error);
+            }
+        }
+
+        // TRELLO TASK: Status Update | BACKEND
+        async function executeDispatch(id) {
+            try {
+                // EXPECTATION: Backend exposes a PUT route to update status
+                const response = await fetch(`/api/dispatch/${id}/status`, { 
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: "Dispatched" })
+                });
+
+                if (!response.ok) {
+                    // Fallback to PATCH /api/v1/dispatch/reports/${id}/status
+                    await fetch(`/api/v1/dispatch/reports/${id}/status`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ status: "ACKNOWLEDGED" })
+                    });
+                }
+                
+                console.log(`[SYS_CMD] Units deployed to ${id}`);
+                hydrateDashboard(); // Force re-render of the data table
+            } catch (error) {
+                console.error(`[SYS_ERR] Failed to dispatch units to ${id}.`, error);
+            }
+        }
+
+        function renderGrid(data) {
+            const tbody = document.getElementById('feed-body');
+            tbody.innerHTML = '';
+
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: #555;">NO ACTIVE INCIDENTS REPORTED</td></tr>';
+                return;
+            }
+
+            data.forEach(inc => {
+                const st = (inc.status || 'PENDING').toUpperCase();
+                const isPending = st === 'PENDING' || st === 'REPORTED';
+                const timeStamp = inc.timestamp || inc.created_at;
+                const timeStr = timeStamp ? new Date(timeStamp).toLocaleTimeString() : 'N/A';
+                const lat = typeof inc.latitude === 'number' ? inc.latitude.toFixed(4) : inc.latitude;
+                const lng = typeof inc.longitude === 'number' ? inc.longitude.toFixed(4) : inc.longitude;
+                const typeStr = inc.type || 'POLICE';
+                
+                const tr = document.createElement('tr');
+                if (isPending) tr.className = 'row-alert';
+                
+                tr.innerHTML = `
+                    <td style="color: #666;">${inc.id}</td>
+                    <td>${timeStr}</td>
+                    <td><span class="badge type-${typeStr.toLowerCase()}">${typeStr}</span></td>
+                    <td class="coord-text">${lat}, ${lng}</td>
+                    <td style="color: ${isPending ? 'var(--accent-red)' : 'var(--text-muted)'}">${st}</td>
+                    <td>
+                        <button class="btn-dispatch" onclick="executeDispatch('${inc.id}')" ${!isPending ? 'disabled' : ''}>
+                            ${isPending ? 'Assign Unit' : 'Deployed'}
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Real-time WebSocket connection with auto fallback to polling
+        function setupWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/dispatch`;
+            try {
+                const ws = new WebSocket(wsUrl);
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    if (data.event === 'INITIAL_SNAPSHOT') {
+                        renderGrid(data.incidents);
+                    } else if (data.event === 'INCIDENT_CREATED' || data.event === 'INCIDENT_STATUS_UPDATED' || data.event === 'UNIT_ASSIGNED') {
+                        hydrateDashboard();
+                    }
+                };
+                ws.onclose = () => {
+                    console.log("[WS] Disconnected, polling backup active");
+                };
+            } catch (e) {
+                console.log("[WS] WebSockets unavailable, falling back to polling");
+            }
+        }
+
+        // Initialize Data Loop & WebSockets
+        hydrateDashboard();
+        setupWebSocket();
+        setInterval(hydrateDashboard, 3000); // Poll every 3 seconds for vertical prototype
+    </script>
+</body>
+</html>

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gotham Emergency Beacon</title>
+    <style>
+        :root {
+            --bg-base: #0a0a0c;
+            --surface: #1c1c1f;
+            --text-main: #f0f0f0;
+            --police: #2980b9;
+            --fire: #c0392b;
+            --medical: #27ae60;
+        }
+        
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        .header-container { margin-bottom: 30px; text-align: center; }
+        .header-container h1 { font-size: 1.2rem; letter-spacing: 2px; text-transform: uppercase; color: #666; margin: 0; }
+        .header-container p { font-size: 0.9rem; color: #888; margin-top: 5px; }
+
+        .nav-bar {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 0.8rem;
+        }
+        .nav-bar a {
+            color: #f39c12;
+            text-decoration: none;
+            margin: 0 10px;
+            border: 1px solid #333;
+            padding: 4px 10px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        .nav-bar a:hover {
+            background: #222;
+        }
+
+        .btn-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            flex-grow: 1;
+            justify-content: center;
+        }
+
+        .alert-btn {
+            background-color: var(--surface);
+            border: 1px solid #333;
+            border-radius: 16px;
+            padding: 30px 20px;
+            font-size: 1.5rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .alert-btn:active { transform: scale(0.96); }
+        .alert-btn.police { border-left: 6px solid var(--police); }
+        .alert-btn.fire { border-left: 6px solid var(--fire); }
+        .alert-btn.medical { border-left: 6px solid var(--medical); }
+
+        .status-panel {
+            margin-top: auto;
+            padding: 15px;
+            background: #111;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 0.85rem;
+            color: #777;
+            border: 1px solid #222;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header-container">
+        <h1>GCPD Beacon</h1>
+        <p>Tap to instantly transmit location.</p>
+        <div class="nav-bar">
+            <a href="/dispatcher">Dispatcher Terminal &raquo;</a>
+            <a href="/docs" target="_blank">API Docs</a>
+        </div>
+    </div>
+
+    <div class="btn-grid">
+        <button class="alert-btn police" onclick="initiateDispatch('Police')">
+            <span>Police</span> <span>&#9888;</span>
+        </button>
+        <button class="alert-btn fire" onclick="initiateDispatch('Fire')">
+            <span>Fire</span> <span>&#9810;</span>
+        </button>
+        <button class="alert-btn medical" onclick="initiateDispatch('Medical')">
+            <span>Medical</span> <span>&#10010;</span>
+        </button>
+    </div>
+
+    <div id="sys-status" class="status-panel">
+        Awaiting user input. Location services required.
+    </div>
+
+    <script>
+        const statusDisplay = document.getElementById('sys-status');
+
+        function initiateDispatch(type) {
+            statusDisplay.innerText = "Acquiring secure GPS lock...";
+            statusDisplay.style.color = "#aaa";
+
+            if (!navigator.geolocation) {
+                // Default to Gotham City central coordinates (40.7128, -74.0060) if geolocation unsupported
+                transmitPayload(type, { latitude: 40.7128, longitude: -74.0060 });
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                (position) => transmitPayload(type, position.coords),
+                (err) => {
+                    // Fallback to Gotham coordinates if GPS access denied or unavailable in test env
+                    console.warn("GPS unavailable or denied, utilizing Gotham default coordinates:", err);
+                    transmitPayload(type, { latitude: 40.7128, longitude: -74.0060 });
+                },
+                { timeout: 5000 }
+            );
+        }
+
+        // TRELLO TASK: Submission Action | MIX
+        // This is the exact contract the backend must receive.
+        async function transmitPayload(type, coords) {
+            const payload = {
+                id: crypto.randomUUID(), // Unique identifier for the incident
+                type: type,
+                latitude: coords.latitude,
+                longitude: coords.longitude,
+                timestamp: new Date().toISOString(),
+                status: "Pending"
+            };
+
+            statusDisplay.innerText = `Transmitting ${type.toUpperCase()} request...`;
+
+            try {
+                // EXPECTATION: Backend exposes a POST route at /api/dispatch
+                const response = await fetch('/api/dispatch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    statusDisplay.innerText = `CONFIRMED: ${type.toUpperCase()} units are en route.`;
+                    statusDisplay.style.color = "var(--medical)";
+                } else {
+                    const errData = await response.json().catch(() => ({}));
+                    throw new Error(errData.detail || 'Server rejected the payload schema.');
+                }
+            } catch (error) {
+                console.error(error);
+                statusDisplay.innerText = "NETWORK ERROR: Fallback to local emergency line (911).";
+                statusDisplay.style.color = "var(--fire)";
+            }
+        }
+    </script>
+</body>
+</html>

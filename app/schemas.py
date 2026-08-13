@@ -1,6 +1,6 @@
 from enum import Enum
 from datetime import datetime
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, computed_field
 
 
 class EmergencyType(str, Enum):
@@ -8,12 +8,28 @@ class EmergencyType(str, Enum):
     POLICE = "POLICE"
     MEDICAL = "MEDICAL"
 
+    @classmethod
+    def _missing_(cls, value):
+        if isinstance(value, str):
+            for member in cls:
+                if member.value.upper() == value.upper():
+                    return member
+        return None
+
 
 class Priority(str, Enum):
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
     CRITICAL = "CRITICAL"
+
+    @classmethod
+    def _missing_(cls, value):
+        if isinstance(value, str):
+            for member in cls:
+                if member.value.upper() == value.upper():
+                    return member
+        return None
 
 
 class IncidentStatus(str, Enum):
@@ -25,6 +41,17 @@ class IncidentStatus(str, Enum):
     RESOLVED = "RESOLVED"
     CANCELLED = "CANCELLED"
 
+    @classmethod
+    def _missing_(cls, value):
+        if isinstance(value, str):
+            val_upper = value.upper()
+            if val_upper == "PENDING":
+                return cls.REPORTED
+            for member in cls:
+                if member.value.upper() == val_upper:
+                    return member
+        return None
+
 
 class UnitStatus(str, Enum):
     AVAILABLE = "AVAILABLE"
@@ -32,14 +59,23 @@ class UnitStatus(str, Enum):
     BUSY = "BUSY"
     OFFLINE = "OFFLINE"
 
+    @classmethod
+    def _missing_(cls, value):
+        if isinstance(value, str):
+            for member in cls:
+                if member.value.upper() == value.upper():
+                    return member
+        return None
+
 
 class IncidentCreate(BaseModel):
+    id: str | None = Field(default=None, description="Optional custom client-generated incident ID")
     type: EmergencyType
-    description: str = Field(..., min_length=1, description="Description of the emergency")
+    description: str = Field(default="Emergency beacon signal received", min_length=1, description="Description of the emergency")
     latitude: float = Field(..., ge=-90.0, le=90.0, description="Latitude between -90 and 90")
     longitude: float = Field(..., ge=-180.0, le=180.0, description="Longitude between -180 and 180")
     address: str | None = Field(default=None, description="Optional street address")
-    priority: Priority
+    priority: Priority = Field(default=Priority.HIGH, description="Emergency priority level")
 
 
 class IncidentStatusUpdate(BaseModel):
@@ -57,6 +93,10 @@ class IncidentResponse(BaseModel):
     status: IncidentStatus
     created_at: datetime
     updated_at: datetime
+
+    @computed_field
+    def timestamp(self) -> datetime:
+        return self.created_at
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -87,3 +127,4 @@ class AssignmentResponse(BaseModel):
     unassigned_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
+

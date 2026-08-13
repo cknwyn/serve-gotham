@@ -1,10 +1,14 @@
 import os
+from pathlib import Path
 from typing import List, Optional
 from fastapi import FastAPI, Depends, status, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
 from app.database import engine, Base, get_db
+import app.models  # noqa: F401
 from app.schemas import (
     IncidentCreate,
     IncidentResponse,
@@ -42,13 +46,93 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static files directory if it exists
+static_dir = Path(__file__).parent / "static"
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
 # TODO: Production deployment requires dispatcher authentication and authorization (e.g. OAuth2 / JWT).
+
+
+# -----------------------------------------------------------------------------
+# Frontend HTML View Routes
+# -----------------------------------------------------------------------------
+
+@app.get("/", include_in_schema=False)
+def serve_index_page():
+    index_file = static_dir / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
+    return {"message": "Gotham Emergency Dispatch System operational. Visit /docs for API documentation."}
+
+
+@app.get("/citizen", include_in_schema=False)
+def serve_citizen_page():
+    citizen_file = static_dir / "citizen.html"
+    if citizen_file.exists():
+        return FileResponse(citizen_file)
+    return serve_index_page()
+
+
+@app.get("/dispatcher", include_in_schema=False)
+def serve_dispatcher_page():
+    dispatcher_file = static_dir / "dispatcher.html"
+    if dispatcher_file.exists():
+        return FileResponse(dispatcher_file)
+    return {"message": "GCPD Dispatcher Terminal UI file not found."}
 
 
 @app.get("/health", tags=["Health"])
 def health_check():
     """Health status endpoint."""
     return {"status": "ok", "service": "gotham-emergency-dispatch"}
+
+
+# -----------------------------------------------------------------------------
+# Unified /api/dispatch Endpoints for Frontend Contracts
+# -----------------------------------------------------------------------------
+
+@app.post(
+    "/api/dispatch",
+    response_model=IncidentResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Emergency Dispatch"],
+    summary="Submit citizen emergency dispatch request",
+    description="Frontend endpoint for Citizen Emergency Beacon."
+)
+async def dispatch_post_report(
+    report_data: IncidentCreate,
+    db: Session = Depends(get_db)
+):
+    return await incident_service.create_report(db, report_data)
+
+
+@app.get(
+    "/api/dispatch",
+    response_model=List[IncidentResponse],
+    tags=["Emergency Dispatch"],
+    summary="List active dispatch incidents",
+    description="Frontend endpoint for Dispatcher Command Terminal."
+)
+def dispatch_get_reports(
+    db: Session = Depends(get_db)
+):
+    return incident_service.list_reports(db)
+
+
+@app.put(
+    "/api/dispatch/{incident_id}/status",
+    response_model=IncidentResponse,
+    tags=["Emergency Dispatch"],
+    summary="Update dispatch incident status",
+    description="Frontend endpoint to update status of an incident (e.g. Dispatched)."
+)
+async def dispatch_put_report_status(
+    incident_id: str,
+    status_update: IncidentStatusUpdate,
+    db: Session = Depends(get_db)
+):
+    return await incident_service.update_report_status(db, incident_id, status_update.status)
 
 
 # -----------------------------------------------------------------------------
@@ -191,3 +275,4 @@ async def websocket_dispatch_endpoint(websocket: WebSocket, db: Session = Depend
         manager.disconnect(websocket)
     except Exception:
         manager.disconnect(websocket)
+

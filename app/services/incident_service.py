@@ -7,7 +7,7 @@ from app.websocket import manager
 
 
 VALID_TRANSITIONS = {
-    IncidentStatus.REPORTED: {IncidentStatus.ACKNOWLEDGED, IncidentStatus.CANCELLED},
+    IncidentStatus.REPORTED: {IncidentStatus.ACKNOWLEDGED, IncidentStatus.DISPATCHED, IncidentStatus.CANCELLED},
     IncidentStatus.ACKNOWLEDGED: {IncidentStatus.DISPATCHED, IncidentStatus.CANCELLED},
     IncidentStatus.DISPATCHED: {IncidentStatus.EN_ROUTE, IncidentStatus.CANCELLED},
     IncidentStatus.EN_ROUTE: {IncidentStatus.ON_SCENE, IncidentStatus.CANCELLED},
@@ -18,15 +18,19 @@ VALID_TRANSITIONS = {
 
 
 async def create_report(db: Session, report_data: IncidentCreate) -> Incident:
-    incident = Incident(
-        type=report_data.type.value,
-        description=report_data.description,
-        latitude=report_data.latitude,
-        longitude=report_data.longitude,
-        address=report_data.address,
-        priority=report_data.priority.value,
-        status=IncidentStatus.REPORTED.value,
-    )
+    kwargs = {
+        "type": report_data.type.value,
+        "description": report_data.description,
+        "latitude": report_data.latitude,
+        "longitude": report_data.longitude,
+        "address": report_data.address,
+        "priority": report_data.priority.value,
+        "status": IncidentStatus.REPORTED.value,
+    }
+    if report_data.id:
+        kwargs["id"] = report_data.id
+
+    incident = Incident(**kwargs)
     db.add(incident)
     db.commit()
     db.refresh(incident)
