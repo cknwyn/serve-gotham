@@ -87,3 +87,15 @@ class AssignmentResponse(BaseModel):
     unassigned_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# Geo & Spatial Schemas
+
+class NearbyIncidentResponse(BaseModel):
+    incident: IncidentResponse
+    distance_km: float
+
+
+class NearestUnitResponse(BaseModel):
+    unit: UnitResponse
+    distance_km: float

@@ -354,3 +354,51 @@ def test_websocket_dispatcher():
         assert isinstance(data["incidents"], list)
         assert len(data["incidents"]) == 1
         assert data["incidents"][0]["type"] == "FIRE"
+
+
+# -----------------------------------------------------------------------------
+# 8. Geolocator & Spatial Map APIs
+# -----------------------------------------------------------------------------
+
+def test_map_geojson():
+    client.post("/api/v1/reports", json={
+        "type": "FIRE", "description": "Chemical spill", "latitude": 40.7128, "longitude": -74.0060, "priority": "HIGH"
+    })
+    client.post("/api/v1/units", json={
+        "type": "FIRE", "call_sign": "FIRE-GEO-1", "latitude": 40.7200, "longitude": -74.0100
+    })
+
+    res = client.get("/api/v1/dispatch/map/geojson")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["type"] == "FeatureCollection"
+    assert len(data["features"]) >= 2
+
+
+def test_spatial_nearby_and_nearest_units():
+    # Create incident
+    report = client.post("/api/v1/reports", json={
+        "type": "MEDICAL", "description": "Collapsed runner", "latitude": 40.7128, "longitude": -74.0060, "priority": "HIGH"
+    }).json()
+
+    # Create two medical units at different distances
+    unit_close = client.post("/api/v1/units", json={
+        "type": "MEDICAL", "call_sign": "MED-CLOSE", "latitude": 40.7150, "longitude": -74.0050
+    }).json()
+    unit_far = client.post("/api/v1/units", json={
+        "type": "MEDICAL", "call_sign": "MED-FAR", "latitude": 40.8000, "longitude": -74.1000
+    }).json()
+
+    # Test nearest unit search
+    res_nearest = client.get("/api/v1/dispatch/map/units/nearest?latitude=40.7128&longitude=-74.0060&unit_type=MEDICAL")
+    assert res_nearest.status_code == 200
+    nearest_data = res_nearest.json()
+    assert nearest_data["unit"]["call_sign"] == "MED-CLOSE"
+    assert nearest_data["distance_km"] < 1.0
+
+    # Test nearby incident search
+    res_nearby = client.get("/api/v1/dispatch/map/incidents/nearby?latitude=40.7128&longitude=-74.0060&radius_km=5.0")
+    assert res_nearby.status_code == 200
+    assert len(res_nearby.json()) >= 1
+    assert res_nearby.json()[0]["incident"]["id"] == report["id"]
+

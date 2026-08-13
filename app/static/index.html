@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gotham City Emergency Services Dispatch Board & Map</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <!-- Leaflet Map CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root {
+      --bg-dark: #0a0e17;
+      --panel-bg: rgba(22, 28, 45, 0.75);
+      --panel-border: rgba(255, 255, 255, 0.08);
+      --primary-accent: #3b82f6;
+      --gold-accent: #f59e0b;
+      --red-accent: #ef4444;
+      --green-accent: #10b981;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --card-bg: #111827;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(59, 130, 246, 0.12), transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(239, 68, 68, 0.08), transparent 40%);
+    }
+
+    header {
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--panel-border);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-logo {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #f59e0b, #ef4444);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1.2rem;
+      color: #000;
+    }
+
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .ws-status {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.875rem;
+      padding: 0.35rem 0.85rem;
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--panel-border);
+    }
+
+    .ws-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--red-accent);
+      box-shadow: 0 0 8px var(--red-accent);
+    }
+
+    .ws-dot.connected {
+      background: var(--green-accent);
+      box-shadow: 0 0 8px var(--green-accent);
+    }
+
+    main {
+      padding: 1.5rem;
+      max-width: 1600px;
+      margin: 0 auto;
+      width: 100%;
+      display: grid;
+      grid-template-columns: 340px 1fr 340px;
+      gap: 1.25rem;
+      flex: 1;
+    }
+
+    .panel {
+      background: var(--panel-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--panel-border);
+      border-radius: 14px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--panel-border);
+    }
+
+    .panel-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+
+    /* Form */
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    input, select, textarea {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 0.65rem 0.85rem;
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 0.875rem;
+      transition: all 0.2s;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary-accent);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    }
+
+    .btn {
+      background: linear-gradient(135deg, var(--primary-accent), #2563eb);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      font-size: 0.875rem;
+    }
+
+    .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+    }
+
+    .btn-secondary:hover { background: rgba(255, 255, 255, 0.12); }
+    .btn-sm { padding: 0.35rem 0.65rem; font-size: 0.75rem; border-radius: 6px; }
+
+    /* Map container */
+    #map {
+      width: 100%;
+      height: 380px;
+      border-radius: 10px;
+      border: 1px solid var(--panel-border);
+      z-index: 1;
+    }
+
+    /* Incidents List */
+    .incidents-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+      overflow-y: auto;
+      max-height: 280px;
+      padding-right: 4px;
+    }
+
+    .incident-card {
+      background: var(--card-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      padding: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+
+    .card-top { display: flex; justify-content: space-between; align-items: center; }
+
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .badge-FIRE { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+    .badge-POLICE { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.4); }
+    .badge-MEDICAL { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+    .badge-status { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+
+    .incident-desc { font-size: 0.85rem; color: var(--text-main); line-height: 1.4; }
+    .incident-meta { font-size: 0.75rem; color: var(--text-muted); display: flex; justify-content: space-between; }
+
+    .units-grid { display: flex; flex-direction: column; gap: 0.65rem; overflow-y: auto; max-height: 220px; }
+
+    .unit-card {
+      background: var(--card-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 0.65rem 0.85rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .unit-callsign { font-weight: 700; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; }
+
+    .terminal-log {
+      background: #000;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 0.65rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: #34d399;
+      height: 180px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+
+    .log-event { color: #f59e0b; }
+
+    /* Custom Leaflet popup styling */
+    .leaflet-popup-content-wrapper {
+      background: #1e293b !important;
+      color: #f3f4f6 !important;
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+    }
+    .leaflet-popup-tip { background: #1e293b !important; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-logo">G</div>
+      <div class="brand-title">Gotham Dispatch & Geolocator Command</div>
+    </div>
+    <div class="ws-status">
+      <div class="ws-dot" id="wsDot"></div>
+      <span id="wsText">Connecting...</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Left Column: Report Form & Spatial Finder -->
+    <section class="panel">
+      <div class="panel-header">
+        <h2 class="panel-title">Report Emergency</h2>
+      </div>
+      <form id="reportForm">
+        <div class="form-group">
+          <label>Emergency Type</label>
+          <select id="repType">
+            <option value="MEDICAL">MEDICAL</option>
+            <option value="FIRE">FIRE</option>
+            <option value="POLICE">POLICE</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Priority</label>
+          <select id="repPriority">
+            <option value="HIGH">HIGH</option>
+            <option value="CRITICAL">CRITICAL</option>
+            <option value="MEDIUM">MEDIUM</option>
+            <option value="LOW">LOW</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea id="repDesc" rows="2" required>Incident reported near Gotham Central Bank.</textarea>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+          <div class="form-group">
+            <label>Latitude (Click Map)</label>
+            <input type="number" step="any" id="repLat" value="40.7128" required>
+          </div>
+          <div class="form-group">
+            <label>Longitude</label>
+            <input type="number" step="any" id="repLon" value="-74.0060" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Address</label>
+          <input type="text" id="repAddr" value="Gotham Plaza">
+        </div>
+        <button type="submit" class="btn">Dispatch Report</button>
+      </form>
+    </section>
+
+    <!-- Center Column: Map & Active Incidents -->
+    <section class="panel">
+      <div class="panel-header">
+        <h2 class="panel-title">Gotham City Map Geolocator</h2>
+        <button class="btn btn-secondary btn-sm" onclick="findNearestUnitForForm()">Find Nearest Unit</button>
+      </div>
+
+      <div id="map"></div>
+
+      <div class="panel-header" style="margin-top: 0.5rem;">
+        <h2 class="panel-title">Active Queue (<span id="incidentCount">0</span>)</h2>
+      </div>
+      <div class="incidents-list" id="incidentsList"></div>
+    </section>
+
+    <!-- Right Column: Units & Real-Time Stream -->
+    <section class="panel">
+      <div class="panel-header">
+        <h2 class="panel-title">Response Units</h2>
+        <button class="btn btn-secondary btn-sm" onclick="loadUnits()">Refresh</button>
+      </div>
+      <div class="units-grid" id="unitsList"></div>
+
+      <div class="panel-header" style="margin-top: 0.5rem;">
+        <h2 class="panel-title">WebSocket Event Stream</h2>
+      </div>
+      <div class="terminal-log" id="terminalLog">
+        <div class="log-line">[SYSTEM] Initializing dispatcher stream...</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    const API_BASE = 'http://localhost:8000/api/v1';
+    let socket = null;
+    let availableUnits = [];
+    let map = null;
+    let mapMarkers = [];
+
+    // Initialize Leaflet Map
+    function initMap() {
+      // Centered on Gotham City coordinates
+      map = L.map('map').setView([40.7128, -74.0060], 13);
+
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+        maxZoom: 19
+      }).addTo(map);
+
+      // Map click populates coordinates form
+      map.on('click', (e) => {
+        document.getElementById('repLat').value = e.latlng.lat.toFixed(4);
+        document.getElementById('repLon').value = e.latlng.lng.toFixed(4);
+        logTerminal(`Map clicked: Selected Lat ${e.latlng.lat.toFixed(4)}, Lon ${e.latlng.lng.toFixed(4)}`);
+      });
+
+      refreshMapGeoJSON();
+    }
+
+    // Refresh GeoJSON Map Layer from Backend API
+    async function refreshMapGeoJSON() {
+      if (!map) return;
+      
+      // Clear existing markers
+      mapMarkers.forEach(m => map.removeLayer(m));
+      mapMarkers = [];
+
+      try {
+        const res = await fetch(`${API_BASE}/dispatch/map/geojson`);
+        const geojson = await res.json();
+
+        geojson.features.forEach(feature => {
+          const [lon, lat] = feature.geometry.coordinates;
+          const props = feature.properties;
+
+          let color = '#3b82f6';
+          if (props.type === 'FIRE') color = '#ef4444';
+          if (props.type === 'MEDICAL') color = '#10b981';
+          if (props.entity_type === 'unit') color = '#f59e0b';
+
+          const marker = L.circleMarker([lat, lon], {
+            radius: props.entity_type === 'unit' ? 7 : 10,
+            fillColor: color,
+            color: '#ffffff',
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.85
+          }).addTo(map);
+
+          let popupContent = '';
+          if (props.entity_type === 'incident') {
+            popupContent = `
+              <div style="font-size:0.85rem;">
+                <strong style="color:${color};">[${props.type}] ${props.priority}</strong><br/>
+                <b>Status:</b> ${props.status}<br/>
+                ${props.description}<br/>
+                <button style="margin-top:5px; padding:3px 8px; font-size:0.75rem; background:#3b82f6; color:#fff; border:none; border-radius:4px; cursor:pointer;" onclick="findNearestUnitForCoords(${lat}, ${lon}, '${props.type}', '${props.id}')">Find & Assign Nearest Unit</button>
+              </div>
+            `;
+          } else {
+            popupContent = `
+              <div style="font-size:0.85rem;">
+                <strong style="color:#f59e0b;">UNIT: ${props.call_sign}</strong> (${props.type})<br/>
+                <b>Status:</b> ${props.status}
+              </div>
+            `;
+          }
+
+          marker.bindPopup(popupContent);
+          mapMarkers.push(marker);
+        });
+      } catch (err) {
+        console.error('Failed to load GeoJSON map features:', err);
+      }
+    }
+
+    // Spatial API: Find nearest unit for a specific coordinate
+    async function findNearestUnitForCoords(lat, lon, unitType, incidentId) {
+      try {
+        const res = await fetch(`${API_BASE}/dispatch/map/units/nearest?latitude=${lat}&longitude=${lon}&unit_type=${unitType}`);
+        if (!res.ok) {
+          const err = await res.json();
+          alert(`Nearest Unit Lookup: ${err.detail}`);
+          return;
+        }
+        const data = await res.json();
+        const unit = data.unit;
+        const dist = data.distance_km;
+
+        if (confirm(`Nearest unit found: ${unit.call_sign} (${dist} km away). Assign to this incident now?`)) {
+          await assignUnitDirect(incidentId, unit.id);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function findNearestUnitForForm() {
+      const lat = parseFloat(document.getElementById('repLat').value);
+      const lon = parseFloat(document.getElementById('repLon').value);
+      const type = document.getElementById('repType').value;
+      try {
+        const res = await fetch(`${API_BASE}/dispatch/map/units/nearest?latitude=${lat}&longitude=${lon}&unit_type=${type}`);
+        if (!res.ok) {
+          const err = await res.json();
+          alert(`Spatial Lookup: ${err.detail}`);
+          return;
+        }
+        const data = await res.json();
+        alert(`Nearest available ${type} unit is ${data.unit.call_sign} located ${data.distance_km} km away.`);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function assignUnitDirect(incidentId, unitId) {
+      try {
+        const res = await fetch(`${API_BASE}/dispatch/reports/${incidentId}/units/${unitId}`, { method: 'POST' });
+        if (res.ok) {
+          logTerminal(`Assigned unit ${unitId} to incident ${incidentId}`);
+          loadIncidents();
+          loadUnits();
+          refreshMapGeoJSON();
+        } else {
+          const err = await res.json();
+          alert(`Assignment failed: ${err.detail}`);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // Initialize WebSockets
+    function initWebSocket() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws/dispatch`;
+
+      socket = new WebSocket(wsUrl);
+
+      socket.onopen = () => {
+        document.getElementById('wsDot').classList.add('connected');
+        document.getElementById('wsText').textContent = 'Live WebSockets Connected';
+        logTerminal('Connected to dispatcher WebSocket event stream');
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          logTerminal(`EVENT RECEIVED: ${data.event}`, true);
+
+          if (data.event === 'INITIAL_SNAPSHOT') {
+            renderIncidents(data.incidents);
+          } else {
+            loadIncidents();
+            loadUnits();
+            refreshMapGeoJSON();
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      };
+
+      socket.onclose = () => {
+        document.getElementById('wsDot').classList.remove('connected');
+        document.getElementById('wsText').textContent = 'Disconnected (Reconnecting...)';
+        logTerminal('WebSocket disconnected. Retrying in 3s...');
+        setTimeout(initWebSocket, 3000);
+      };
+    }
+
+    function logTerminal(msg, isEvent = false) {
+      const term = document.getElementById('terminalLog');
+      const time = new Date().toLocaleTimeString();
+      const line = document.createElement('div');
+      line.className = 'log-line';
+      if (isEvent) {
+        line.innerHTML = `<span class="log-event">[${time}]</span> ${msg}`;
+      } else {
+        line.textContent = `[${time}] ${msg}`;
+      }
+      term.appendChild(line);
+      term.scrollTop = term.scrollHeight;
+    }
+
+    async function loadIncidents() {
+      try {
+        const res = await fetch(`${API_BASE}/dispatch/reports`);
+        const data = await res.json();
+        renderIncidents(data);
+        refreshMapGeoJSON();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function loadUnits() {
+      try {
+        const res = await fetch(`${API_BASE}/dispatch/units`);
+        availableUnits = await res.json();
+        renderUnits(availableUnits);
+        refreshMapGeoJSON();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function renderIncidents(incidents) {
+      document.getElementById('incidentCount').textContent = incidents.length;
+      const container = document.getElementById('incidentsList');
+      container.innerHTML = '';
+
+      if (incidents.length === 0) {
+        container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No emergency reports submitted yet.</div>`;
+        return;
+      }
+
+      incidents.forEach(inc => {
+        const card = document.createElement('div');
+        card.className = 'incident-card';
+
+        let actionsHtml = '';
+        if (inc.status === 'REPORTED') {
+          actionsHtml = `<button class="btn btn-sm" onclick="updateStatus('${inc.id}', 'ACKNOWLEDGED')">Acknowledge</button>`;
+        } else if (inc.status === 'ACKNOWLEDGED') {
+          const matchingUnits = availableUnits.filter(u => u.type === inc.type && u.status === 'AVAILABLE');
+          let unitOpts = matchingUnits.map(u => `<option value="${u.id}">${u.call_sign}</option>`).join('');
+          
+          if (matchingUnits.length > 0) {
+            actionsHtml = `
+              <select id="assign_${inc.id}" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">${unitOpts}</select>
+              <button class="btn btn-sm" onclick="assignUnit('${inc.id}')">Assign Unit</button>
+            `;
+          } else {
+            actionsHtml = `<span style="font-size: 0.75rem; color: var(--gold-accent);">No AVAILABLE ${inc.type} units</span>`;
+          }
+        } else if (inc.status === 'DISPATCHED') {
+          actionsHtml = `<button class="btn btn-sm" onclick="updateStatus('${inc.id}', 'EN_ROUTE')">Mark En Route</button>`;
+        } else if (inc.status === 'EN_ROUTE') {
+          actionsHtml = `<button class="btn btn-sm" onclick="updateStatus('${inc.id}', 'ON_SCENE')">Mark On Scene</button>`;
+        } else if (inc.status === 'ON_SCENE') {
+          actionsHtml = `<button class="btn btn-sm" onclick="updateStatus('${inc.id}', 'RESOLVED')">Resolve</button>`;
+        }
+
+        if (inc.status !== 'RESOLVED' && inc.status !== 'CANCELLED') {
+          actionsHtml += ` <button class="btn btn-secondary btn-sm" onclick="updateStatus('${inc.id}', 'CANCELLED')">Cancel</button>`;
+        }
+
+        card.innerHTML = `
+          <div class="card-top">
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <span class="badge badge-${inc.type}">${inc.type}</span>
+              <span class="badge badge-status">${inc.status}</span>
+            </div>
+            <span style="font-size: 0.75rem; color: var(--gold-accent); font-weight: 700;">${inc.priority}</span>
+          </div>
+          <div class="incident-desc">${inc.description}</div>
+          <div class="incident-meta">
+            <span>Lat: ${inc.latitude.toFixed(4)}, Lon: ${inc.longitude.toFixed(4)}</span>
+            <span>ID: ${inc.id.substring(0, 8)}...</span>
+          </div>
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.25rem;">${actionsHtml}</div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function renderUnits(units) {
+      const container = document.getElementById('unitsList');
+      container.innerHTML = '';
+      units.forEach(u => {
+        const div = document.createElement('div');
+        div.className = 'unit-card';
+        div.innerHTML = `
+          <div>
+            <div class="unit-callsign">${u.call_sign} (${u.type})</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">Lat: ${u.latitude}, Lon: ${u.longitude}</div>
+          </div>
+          <span class="badge ${u.status === 'AVAILABLE' ? 'badge-MEDICAL' : 'badge-status'}">${u.status}</span>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    async function updateStatus(incidentId, newStatus) {
+      try {
+        const res = await fetch(`${API_BASE}/dispatch/reports/${incidentId}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus })
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          alert(`Status update failed: ${err.detail}`);
+        } else {
+          loadIncidents();
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function assignUnit(incidentId) {
+      const select = document.getElementById(`assign_${incidentId}`);
+      if (!select) return;
+      const unitId = select.value;
+      await assignUnitDirect(incidentId, unitId);
+    }
+
+    // Submit Report Form
+    document.getElementById('reportForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const payload = {
+        type: document.getElementById('repType').value,
+        priority: document.getElementById('repPriority').value,
+        description: document.getElementById('repDesc').value,
+        latitude: parseFloat(document.getElementById('repLat').value),
+        longitude: parseFloat(document.getElementById('repLon').value),
+        address: document.getElementById('repAddr').value,
+      };
+
+      try {
+        const res = await fetch(`${API_BASE}/reports`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          logTerminal('Citizen report submitted successfully');
+          loadIncidents();
+        } else {
+          const err = await res.json();
+          alert(`Error: ${JSON.stringify(err.detail)}`);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    });
+
+    // Startup
+    initMap();
+    initWebSocket();
+    loadUnits();
+    loadIncidents();
+  </script>
+</body>
+</html>

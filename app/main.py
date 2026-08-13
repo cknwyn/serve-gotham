@@ -14,8 +14,10 @@ from app.schemas import (
     UnitCreate,
     UnitResponse,
     AssignmentResponse,
+    NearbyIncidentResponse,
+    NearestUnitResponse,
 )
-from app.services import incident_service, dispatch_service
+from app.services import incident_service, dispatch_service, geo_service
 from app.websocket import manager
 
 # Create database tables automatically on startup
@@ -45,8 +47,21 @@ app.add_middleware(
 # TODO: Production deployment requires dispatcher authentication and authorization (e.g. OAuth2 / JWT).
 
 
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+# Serve static dashboard UI
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+
+@app.get("/", include_in_schema=False)
+async def serve_dashboard():
+    return FileResponse("app/static/index.html")
+
+
 @app.get("/health", tags=["Health"])
 def health_check():
+
     """Health status endpoint."""
     return {"status": "ok", "service": "gotham-emergency-dispatch"}
 
@@ -164,6 +179,63 @@ async def assign_unit_to_report(
     db: Session = Depends(get_db)
 ):
     return await dispatch_service.assign_unit(db, incident_id, unit_id)
+
+
+# -----------------------------------------------------------------------------
+# Geolocator & Spatial Map APIs
+# -----------------------------------------------------------------------------
+
+@app.get(
+    "/api/v1/dispatch/map/geojson",
+    tags=["Geolocator & Map"],
+    summary="Get GeoJSON FeatureCollection",
+    description="Returns standard GeoJSON FeatureCollection of all incidents and response units for map rendering."
+)
+def get_map_geojson(db: Session = Depends(get_db)):
+    return geo_service.get_geojson_feature_collection(db)
+
+
+@app.get(
+    "/api/v1/dispatch/map/incidents/nearby",
+    response_model=List[NearbyIncidentResponse],
+    tags=["Geolocator & Map"],
+    summary="Search incidents within a radius",
+    description="Calculates Haversine distance and returns incidents within radius_km (default 10km) sorted by proximity."
+)
+def get_nearby_incidents(
+    latitude: float = Query(..., ge=-90.0, le=90.0),
+    longitude: float = Query(..., ge=-180.0, le=180.0),
+    radius_km: float = Query(10.0, ge=0.1, le=1000.0),
+    status: Optional[IncidentStatus] = Query(None),
+    db: Session = Depends(get_db)
+):
+    return geo_service.find_nearby_incidents(
+        db, latitude=latitude, longitude=longitude, radius_km=radius_km, status_filter=status
+    )
+
+
+@app.get(
+    "/api/v1/dispatch/map/units/nearest",
+    response_model=NearestUnitResponse,
+    tags=["Geolocator & Map"],
+    summary="Find nearest available unit",
+    description="Finds nearest AVAILABLE unit to given coordinates using Haversine distance formula."
+)
+def get_nearest_unit(
+    latitude: float = Query(..., ge=-90.0, le=90.0),
+    longitude: float = Query(..., ge=-180.0, le=180.0),
+    unit_type: Optional[EmergencyType] = Query(None),
+    db: Session = Depends(get_db)
+):
+    res = geo_service.find_nearest_unit(db, latitude=latitude, longitude=longitude, unit_type=unit_type)
+    if not res:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No available response unit found near the specified location"
+        )
+    return res
+
 
 
 # -----------------------------------------------------------------------------

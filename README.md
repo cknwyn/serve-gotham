@@ -240,6 +240,32 @@ POST /api/v1/dispatch/reports/{incident_id}/units/{unit_id}
 }
 ```
 
+### 5. Geolocator & Spatial Map APIs
+
+#### GeoJSON FeatureCollection Stream
+
+```http
+GET /api/v1/dispatch/map/geojson
+```
+
+Returns standard GeoJSON format for mapping engines (Leaflet, Mapbox, Google Maps).
+
+#### Find Incidents Nearby (Radius Search)
+
+```http
+GET /api/v1/dispatch/map/incidents/nearby?latitude=40.7128&longitude=-74.0060&radius_km=5.0
+```
+
+Calculates Haversine distance and returns incidents within specified radius (in km) sorted by proximity.
+
+#### Find Nearest Available Unit
+
+```http
+GET /api/v1/dispatch/map/units/nearest?latitude=40.7128&longitude=-74.0060&unit_type=FIRE
+```
+
+Finds closest `AVAILABLE` unit to given coordinates and returns unit details along with calculated `distance_km`.
+
 ---
 
 ## Real-Time Dispatcher WebSocket (`/ws/dispatch`)
